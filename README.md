@@ -8,7 +8,7 @@ keepass.io is a simple KeePass database reader written in NodeJS.
 GPL version 3. Please take a look into LICENSE if you want to know more.
 
 ## Warning ##
-This branch is under **heavy development*. For production usage, please take a look at the master branch.
+This branch is under **heavy development**. For production usage, please take a look at the master branch.
 
 - - -
 keepass.io KeePass database reader - © 2012-2013 P. Mathis (dev@snapserv.net)
