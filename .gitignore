@@ -6,6 +6,12 @@ lib-cov
 *.out
 *.pid
 *.gz
+*.iml
+
+*.js
+*.map
+native/build/*
+!native/build/.gitkeep
 
 pids
 logs
