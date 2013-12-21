@@ -5,6 +5,7 @@
 
 async = require('async')
 crypto = require('crypto')
+zlib = require('zlib')
 constants = require('../constants')
 errors = require('../util/errors')
 helpers = require('../util/helpers')
@@ -15,6 +16,7 @@ module.exports = class Database
   constructor: (@rawDatabase, @compositeHash) ->
     @header = new Header()
     @reader = new Reader()
+
 
   # Reads the whole database. Please be careful, this method
   # overwrites / resets any existing data! Because this function
@@ -32,9 +34,18 @@ module.exports = class Database
       (cb) => @buildMasterKey(cb)
       (cb) => @decrypt(cb)
       (cb) => @processHBIO(cb)
+      (cb) => @decompress(cb)
     ], (err) -> cb(err))
 
-  # TODO: Add documentation
+  # This method builds the master key by transforming the
+  # composite hash X times and applying SHA256 to the result.
+  # X can be configured in KeePass, so each user is able to
+  # decide how many transformation rounds should be done.
+  # This can help to migitate bruteforce attempts, although
+  # it increases the loading time of the database.
+  #
+  # If keepass.io can not use the native key transformation method,
+  # a high amount of key transformation rounds could take very long...
   buildMasterKey: (cb) ->
     if constants.DUMP_KEYS then console.log 'Transformation seed: ' + @header.getField('TransformSeed').toString('hex')
     if constants.DUMP_KEYS then console.log 'Transformation rounds: ' + @header.getField('TransformRounds')
@@ -54,7 +65,9 @@ module.exports = class Database
 
     return cb()
 
-  # TODO: Add documentation
+  # Decrypts the database with the master key which was calculated before.
+  # If the decryption fails or the stream start bytes don't match, the database
+  # is either corrupt or the credentials were invalid, so an error will be thrown.
   decrypt: (cb) ->
     cipher = crypto.createDecipheriv('aes-256-cbc', @masterKey, @header.getField('EncryptionIV'))
     @decryptedData = @rawDatabase.slice(@header.getLength()).toString('binary')
@@ -78,11 +91,16 @@ module.exports = class Database
     else
       return cb(new errors.DatabaseError('HBIO check failed. Either your database is corrupt or the provided credentials are incorrect.'))
 
-  # TODO: Add documentation
+  # The KeePass data is stored in hashed blocks. Each block consists of a block index,
+  # a stored precalculated hash, its length and the payload itself. To ensure database
+  # integrity, the hash of each payload will be compared with the saved hash. If they
+  # don't match, an error will be thrown.
+  #
+  # Although if a hashed block is valid and the hashes match, the payload gets written
+  # into a separate buffer. If all blocks are valid, we will end up with one big chunk of data.
   processHBIO: (cb) ->
     @joinedData = new Buffer(@decryptedData.length)
     readOffset = writeOffset = 0
-    currentBlock = 0
 
     # Process all hashed blocks and write them into
     # @joinedData so we have one big piece over data
@@ -96,7 +114,7 @@ module.exports = class Database
       if length > 0
         data = @decryptedData.toString('binary', readOffset, readOffset + length); readOffset += length
         calculatedHash = crypto.createHash('sha256').update(data, 'binary', 'hex').digest('hex')
-        if constants.DUMP_KEYS then console.log 'HBIO block #' + currentBlock + ': '  + calculatedHash
+        if constants.DUMP_KEYS then console.log 'HBIO block #' + index + ': '  + calculatedHash
 
         # Compare the calculated hash with the stored one. If they are equal,
         # the data gets written to the result buffer. If not, an error will
@@ -107,10 +125,29 @@ module.exports = class Database
           @joinedData.write(data, writeOffset, length, 'binary')
           writeOffset += length
       else
-        if constants.DUMP_KEYS then console.log 'HBIO block #' + currentBlock + ': <empty>'
+        if constants.DUMP_KEYS then console.log 'HBIO block #' + index + ': <empty>'
 
       # Break when an empty block was found
-      currentBlock++
       break unless length != 0
 
     return cb()
+
+  # If the header field 'CompressionFlags' is set to 1,
+  # the database is compressed with gunzip. This method
+  # checks if this flag is set and if yes, tries to
+  # extract it. If the database is not compressed, this
+  # method immediately returns.
+  decompress: (cb) ->
+    # If the database is not compressed, there is nothing to do.
+    if not @header.getField('CompressionFlags')
+      @database = @joinedData
+      return cb()
+
+    # Decompress the database with gzip
+    try
+      zlib.gunzip(@joinedData, (err, decompressedData) =>
+        @database = decompressedData
+        return cb()
+      )
+    catch e
+      return cb(new errors.DatabaseError('Decompression failed. It seems like your database is corrupt.'))
