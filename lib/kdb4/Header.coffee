@@ -61,11 +61,41 @@ module.exports = class Header
 
     return cb()
 
+  # Resolves a field ID given by its name. For example,
+  # 'EndOfHeader' will be resolved to field ID 0.
+  resolveName: (fieldID) ->
+    for keyID, field of HEADER_FIELDS
+      if field.name is fieldID
+        return keyID
+    return undefined
+
+  # Returns the length of the database header
+  getLength: ->
+    return @headerLength
+
+  # Gets the header field with the given ID. It will throw an
+  # error if an invalid field ID was given. Instead of a field ID,
+  # the name of the field can also be given.
+  getField: (fieldID) ->
+    # If field ID is not numeric, search for a field with the given name
+    if not isFinite(fieldID)
+      fieldID = @resolveName(fieldID)
+
+    # Check if given header field ID is valid and exists
+    if not HEADER_FIELDS[fieldID]?
+      return cb(throw new errors.DatabaseError('Unknown header field given with ID: ' + fieldID))
+
+    return @header[fieldID]
+
   # Sets the header field with the given ID. If the header field
   # is defined with a custom 'type', the given value will be automatically
   # unpacked by PyPackJS and then stored in the field. It will throw an
   # error if an invalid field ID was given.
   setField: (fieldID, fieldData) ->
+    # If field ID is not numeric, search for a field with the given name
+    if not isFinite(fieldID)
+      fieldID = @resolveName(fieldID)
+
     # Check if given header field ID is valid and exists
     if not HEADER_FIELDS[fieldID]?
       return cb(throw new errors.DatabaseError('Unknown header field given with ID: ' + fieldID))

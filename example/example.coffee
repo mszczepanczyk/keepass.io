@@ -6,11 +6,11 @@
 path = require('path')
 kpio = require('../lib')
 
-kpion = require('../native/build/Release/kpion.node')
-crypto = require('crypto')
+#db = new kpio.KeePassIO(path.join(__dirname, 'KeePass.kdbx'))
+#db.addCredential(new kpio.KeyfileCredential(path.join(__dirname, 'KeePass.key')))
+#db.addCredential(new kpio.PasswordCredential('testdebugtest'))
 
-db = new kpio.KeePassIO(path.join(__dirname, 'KeePass.kdbx'))
-db.addCredential(new kpio.KeyfileCredential(path.join(__dirname, 'KeePass.key')))
+db = new kpio.KeePassIO(path.join(__dirname, 'test.kdbx'))
 db.addCredential(new kpio.PasswordCredential('123456'))
 db.loadDatabase((err) ->
   # If an error occured, you should throw it immediately

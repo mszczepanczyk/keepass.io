@@ -3,6 +3,7 @@
 # Created by Pascal Mathis at 04.12.2013
 # License: GPLv3 (Please see LICENSE for more information)
 
+crypto = require('crypto')
 PyPackJS = require('./pypackjs')
 
 exports.readBuffer = readBuffer = (buffer, offset, length, type) ->
@@ -18,3 +19,15 @@ exports.sortBy = (key, a, b, r) ->
   return -1*r if a[key] > b[key]
   return +1*r if a[key] < b[key]
   return 0
+
+exports.transformKey = (key, seed, rounds) ->
+  zeroIV = new Buffer(0)
+  key = key.toString('binary')
+
+  while rounds--
+    cipher = crypto.createCipheriv('aes-256-ecb', seed, zeroIV)
+    cipher.setAutoPadding(false)
+    key = cipher.update(key, 'binary', 'binary') + cipher.final('binary')
+
+  key = crypto.createHash('sha256').update(key, 'binary').digest('binary')
+  return key

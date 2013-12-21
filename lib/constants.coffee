@@ -4,6 +4,9 @@
 # License: GPLv3 (Please see LICENSE for more information)
 
 module.exports =
+  # ONLY FOR DEBUGGING REASONS - DUMPS CONFIDENTIAL KEYS
+  DUMP_KEYS: true
+
   # KeePass base signature (0x0 - 0x4)
   BASE_SIGNATURE: 0x9AA2D903
 

@@ -105,6 +105,8 @@ module.exports = class KeePassIO
       .createHash('sha256')
       .update(compositeKeyArray.join(''), 'binary')
       .digest('binary')
+
+    if constants.DUMP_KEYS then console.log 'Composite hash: ' + new Buffer(@compositeHash, 'binary').toString('hex')
     return cb()
 
   # Instantiates the database object which has an appropiate version
