@@ -6,6 +6,7 @@
 async = require('async')
 crypto = require('crypto')
 zlib = require('zlib')
+xml2js = require('xml2js')
 constants = require('../constants')
 errors = require('../util/errors')
 helpers = require('../util/helpers')
@@ -15,8 +16,6 @@ Reader = require('./Reader')
 module.exports = class Database
   constructor: (@rawDatabase, @compositeHash) ->
     @header = new Header()
-    @reader = new Reader()
-
 
   # Reads the whole database. Please be careful, this method
   # overwrites / resets any existing data! Because this function
@@ -35,6 +34,8 @@ module.exports = class Database
       (cb) => @decrypt(cb)
       (cb) => @processHBIO(cb)
       (cb) => @decompress(cb)
+      (cb) => @convertToJson(cb)
+      (cb) => @initializeAPI(cb)
     ], (err) -> cb(err))
 
   # This method builds the master key by transforming the
@@ -140,14 +141,41 @@ module.exports = class Database
   decompress: (cb) ->
     # If the database is not compressed, there is nothing to do.
     if not @header.getField('CompressionFlags')
-      @database = @joinedData
+      @databaseAsXml = @joinedData
       return cb()
 
     # Decompress the database with gzip
     try
       zlib.gunzip(@joinedData, (err, decompressedData) =>
-        @database = decompressedData
+        @databaseAsXml = decompressedData
         return cb()
       )
     catch e
       return cb(new errors.DatabaseError('Decompression failed. It seems like your database is corrupt.'))
+
+  # Converts the XML database structure to JSON. Because xml2js is
+  # 100% one-to-one bidirectional, we can later on just reverse
+  # the process and save it into the KeePass database file.
+  convertToJson: (cb) ->
+    xml2js.parseString(@databaseAsXml, (err, json) =>
+      if err then return cb(err)
+
+      ###
+      # Hey, why not '@databaseAsJson = json'? Because it would generate
+      # a NEW object. But our reader and writer classes require a fixed
+      # pointer which will be initialized during startup, so don't even
+      # try to mess with this piece of code... You've been warned!
+      delete @databaseAsJson[key] for key, value of @databaseAsJson
+      @databaseAsJson[key] = value for key, value of json
+      ###
+
+      @databaseAsJson = json
+      return cb()
+    )
+
+  # Initialize the API classes (reader and writer)
+  # This should always be the last step to ensure that
+  # the Reader and Writer objects got the right pointers.
+  initializeAPI: (cb) ->
+    @reader = new Reader(@databaseAsJson)
+    return cb()

@@ -13,8 +13,14 @@ kpio = require('../lib')
 db = new kpio.KeePassIO(path.join(__dirname, 'test.kdbx'))
 db.addCredential(new kpio.PasswordCredential('123456'))
 db.loadDatabase((err) ->
-  # If an error occured, you should throw it immediately
+  # If an error occured, you should "handle" it immediately
   if err then throw err
 
   # Now you can start working with the KeePass database :)
+  groups = db.reader.groups()
+  for group in groups
+    for entry in group.entries()
+      console.log(entry.fields())
+      console.log(entry.field('Title'))
+
 )

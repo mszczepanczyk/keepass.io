@@ -114,4 +114,10 @@ module.exports = class KeePassIO
   # a first complete 'read' of the database will be made.
   instantiateDatabase: (cb) ->
     @database = new Kdb4Database(@rawDatabase, @compositeHash)
-    @database.read(cb)
+    @database.read((err) =>
+      if err then return cb(err)
+
+      @reader = @database.reader
+      @writer = @database.writer
+      return cb()
+    )
