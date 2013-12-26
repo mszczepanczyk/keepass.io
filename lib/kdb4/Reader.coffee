@@ -10,6 +10,8 @@ class KPNode
   constructor: (@node, @rootNode) ->
     @cache = []
 
+  uuid: -> return @node.select('/UUID/0').value()
+
   groups: ->
     if @cache.groups? then return @cache.groups
 
@@ -36,12 +38,7 @@ class KPEntry extends KPNode
   field: (fieldName) ->
     @rootNode.set('fieldName', fieldName)
     fieldData = @node.select('/String/*[/Key/0 == $/fieldName]').value()
-    console.log @node.select('/String/*[/Key/0 == $/fieldName]').path()
-
-    if fieldData.Value?[0]?
-      return fieldData.Value[0]
-    else
-      return undefined
+    return fieldData.Value?[0] ? null
 
   fields: ->
     return @node.select('/String').value()

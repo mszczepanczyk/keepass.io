@@ -19,8 +19,9 @@ db.loadDatabase((err) ->
   # Now you can start working with the KeePass database :)
   groups = db.reader.groups()
   for group in groups
+    console.log('Group UUID: ' + group.uuid())
     for entry in group.entries()
-      console.log(entry.fields())
-      console.log(entry.field('Title'))
+      console.log('Entry UUID: ' + entry.uuid())
+      console.log('Entry Title: ' + entry.field('Title'))
 
 )
