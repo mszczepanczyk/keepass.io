@@ -177,5 +177,5 @@ module.exports = class Database
   # This should always be the last step to ensure that
   # the Reader and Writer objects got the right pointers.
   initializeAPI: (cb) ->
-    @reader = new Reader(@databaseAsJson, this)
+    @reader = new Reader(@databaseAsJson, @header)
     return cb()
