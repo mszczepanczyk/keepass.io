@@ -23,5 +23,6 @@ db.loadDatabase((err) ->
     for entry in group.entries()
       console.log('Entry UUID: ' + entry.uuid())
       console.log('Entry Title: ' + entry.field('Title'))
-
+      console.log('Entry Password: ' + entry.field('Password'))
+      console.log(entry.fields())
 )

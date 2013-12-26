@@ -4,10 +4,13 @@
 # License: GPLv3 (Please see LICENSE for more information)
 
 SpahQL = require('spahql')
+SalsaStream = require('./SalsaStream')
 errors = require('../util/errors')
 
+# TODO: Add LOADS of documentation
+
 class KPNode
-  constructor: (@node, @rootNode) ->
+  constructor: (@node, @reader) ->
     @cache = []
 
   uuid: -> return @node.select('/UUID/0').value()
@@ -18,7 +21,7 @@ class KPNode
     @cache.groups = []
     groupCount = @node.select('/*/Group').length - 1
     for groupIndex in [0..groupCount]
-      @cache.groups.push(new KPGroup(@node.select('/' + groupIndex + '/Group/0'), @rootNode))
+      @cache.groups.push(new KPGroup(@node.select('/' + groupIndex + '/Group/0'), @reader))
 
     return @cache.groups
 
@@ -28,7 +31,7 @@ class KPNode
     @cache.entries = []
     entryCount = @node.select('/Entry/*').length - 1
     for entryIndex in [0..entryCount]
-      @cache.entries.push(new KPEntry(@node.select('/Entry/' + entryIndex), @rootNode))
+      @cache.entries.push(new KPEntry(@node.select('/Entry/' + entryIndex), @reader))
 
     return @cache.entries
 
@@ -36,14 +39,36 @@ class KPGroup extends KPNode
 
 class KPEntry extends KPNode
   field: (fieldName) ->
-    @rootNode.set('fieldName', fieldName)
-    fieldData = @node.select('/String/*[/Key/0 == $/fieldName]').value()
-    return fieldData.Value?[0] ? null
+    @reader.db.set('fieldName', fieldName)
+    fieldData = @node.select('/String/*[/Key/0 == $/fieldName]')
+
+    if (fieldValue = fieldData.value().Value?[0])
+      if fieldValue._? and fieldValue.$? and not fieldValue.$.Protected
+        return fieldValue._
+      else
+        return fieldValue
+    else
+      return null
 
   fields: ->
-    return @node.select('/String').value()
+    result = {}
+    fieldNames = @node.select('/String/*/Key/0').values()
+    for fieldName in fieldNames
+      result[fieldName] = @field(fieldName)
+
+    return result
 
 module.exports = class Reader extends KPNode
-  constructor: (database) ->
+  constructor: (database, @parent) ->
     @db = SpahQL.db(database)
-    super(@db.select('/KeePassFile/Root'), @db)
+    @unprotectPasswords()
+
+    super(@db.select('/KeePassFile/Root'), this)
+
+  unprotectPasswords: ->
+    salsaStream = new SalsaStream(@parent.header.getField('ProtectedStreamKey').toString('binary'))
+
+    protectedEntries = @db.select('//String/*/Value/0[/*/Protected == "True"]')
+    for protectedEntry in protectedEntries
+      protectedEntry.value._ = salsaStream.unprotect(protectedEntry.value._)
+      protectedEntry.value.$.Protected = false
