@@ -20,9 +20,11 @@ class KPNode
     if @cache.groups? then return @cache.groups
 
     @cache.groups = []
-    groupCount = @node.select('/*/Group').length - 1
-    for groupIndex in [0..groupCount]
-      @cache.groups.push(new KPGroup(@node.select('/' + groupIndex + '/Group/0'), @rootNode))
+    groupCount = @node.select('/Group/*').length
+
+    if groupCount >= 1
+      for groupIndex in [0..groupCount - 1]
+        @cache.groups.push(new KPGroup(@node.select('/Group/' + groupIndex), @rootNode))
 
     return @cache.groups
 
@@ -32,9 +34,11 @@ class KPNode
     if @cache.entries? then return @cache.entries
 
     @cache.entries = []
-    entryCount = @node.select('/Entry/*').length - 1
-    for entryIndex in [0..entryCount]
-      @cache.entries.push(new KPEntry(@node.select('/Entry/' + entryIndex), @rootNode))
+    entryCount = @node.select('/Entry/*').length
+
+    if entryCount >= 1
+      for entryIndex in [0..entryCount - 1]
+        @cache.entries.push(new KPEntry(@node.select('/Entry/' + entryIndex), @rootNode))
 
     return @cache.entries
 
@@ -46,10 +50,13 @@ class KPEntry extends KPNode
   # the field was/is protected, the unprotected string will
   # be returned.
   field: (fieldName) ->
-    @rootNode.set('fieldName', fieldName)
-    fieldData = @node.select('/String/*[/Key/0 == $/fieldName]')
+    # Search the field WITHOUT SpahQL, about thousand times faster...
+    for stringAttr, index in @node.value().String
+      if stringAttr.Key[0] == fieldName
+        fieldData = @node.select('/String/' + index)
+        break
 
-    if (fieldValue = fieldData.value().Value?[0])
+    if fieldData and (fieldValue = fieldData.value().Value?[0])
       if fieldValue._? and fieldValue.$? and not fieldValue.$.Protected
         return fieldValue._
       else
@@ -72,7 +79,7 @@ module.exports = class Reader extends KPNode
     @db = SpahQL.db(database)
     @unprotectPasswords()
 
-    super(@db.select('/KeePassFile/Root'), @db)
+    super(@db.select('/KeePassFile/Root/0'), @db)
 
   # Unprotects all passwords in the database. Basically, this method
   # executes an recursive search through the database, looking for attributes
@@ -86,5 +93,6 @@ module.exports = class Reader extends KPNode
 
     protectedEntries = @db.select('//String/*/Value/0[/*/Protected == "True"]')
     for protectedEntry in protectedEntries
+      if not protectedEntry.value._? then continue
       protectedEntry.value._ = salsaStream.unprotect(protectedEntry.value._)
       protectedEntry.value.$.Protected = false
