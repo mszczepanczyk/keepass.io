@@ -11,7 +11,7 @@ constants = require('../constants')
 errors = require('../util/errors')
 helpers = require('../util/helpers')
 Header = require('./Header')
-Reader = require('./Reader')
+DatabaseAPI = require('./DatabaseAPI')
 
 module.exports = class Database
   constructor: (@rawDatabase, @compositeHash) ->
@@ -36,6 +36,7 @@ module.exports = class Database
       (cb) => @decompress(cb)
       (cb) => @convertToJson(cb)
       (cb) => @initializeAPI(cb)
+      # (cb) => @destroySensitiveData(cb)
     ], (err) -> cb(err))
 
   # This method builds the master key by transforming the
@@ -157,7 +158,7 @@ module.exports = class Database
   # 100% one-to-one bidirectional, we can later on just reverse
   # the process and save it into the KeePass database file.
   convertToJson: (cb) ->
-    xml2js.parseString(@databaseAsXml, (err, json) =>
+    xml2js.parseString(@databaseAsXml, explicitArray: false, (err, json) =>
       if err then return cb(err)
 
       ###
@@ -177,5 +178,5 @@ module.exports = class Database
   # This should always be the last step to ensure that
   # the Reader and Writer objects got the right pointers.
   initializeAPI: (cb) ->
-    @reader = new Reader(@databaseAsJson, @header)
+    @api = new DatabaseAPI(@databaseAsJson, @header)
     return cb()

@@ -48,7 +48,7 @@ module.exports = class KeePassIO
       (cb) => @checkSignatures(cb)
       (cb) => @buildCompositeHash(cb)
       (cb) => @instantiateDatabase(cb)
-    ], (err) -> cb(err))
+    ], (err) => cb(err, @database.api))
 
   # Tries to load the database from the file system.
   # The database can not be specified, it will be read
@@ -114,10 +114,4 @@ module.exports = class KeePassIO
   # a first complete 'read' of the database will be made.
   instantiateDatabase: (cb) ->
     @database = new Kdb4Database(@rawDatabase, @compositeHash)
-    @database.read((err) =>
-      if err then return cb(err)
-
-      @reader = @database.reader
-      @writer = @database.writer
-      return cb()
-    )
+    @database.read(cb)
